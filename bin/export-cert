@@ -1,0 +1,48 @@
+#!/bin/sh
+
+SCRIPT_DIR=`dirname $(readlink -f $0)`
+CONFIG_FILE="$SCRIPT_DIR/../etc/privateCA.conf"
+
+usage() {
+  echo $1
+  echo  "Usage: $0 <filename> [outfile]"
+  echo "Where:"
+  echo "  filename - specifies <filename>.crt and <filename>.key files"
+  echo "  outfile  - name of PKCS#12 file to save exported certificate"
+}
+
+configure() {
+  # First set default values
+  
+  if [ -e "$CONFIG_FILE" ]
+  then
+    . $CONFIG_FILE
+  fi
+}
+
+configure
+
+if [ -z "$1" ]
+then
+  usage "No filename specified!\n"
+  exit 1
+fi
+ 
+if [ -z "$2" ]
+then
+  OUTFILE=$USER_CERT_STOR/$1.p12
+else
+  OUTFILE=$2
+fi
+
+
+CERT_KEY="$USER_CERT_STOR/$1.key"
+CERT="$USER_CERT_STOR/$1.crt"
+
+if [ ! -e "$CERT_KEY" ] || [ ! -e "$CERT" ]
+then
+  echo "Certificate $1.crt or key $1.key not found!"
+  exit 1
+fi
+
+$OPENSSL11 pkcs12 -export -in $CERT -inkey $CERT_KEY -certfile $CACERT -out $OUTFILE

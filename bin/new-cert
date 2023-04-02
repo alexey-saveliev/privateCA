@@ -1,0 +1,75 @@
+#!/bin/sh
+
+SCRIPT_DIR=`dirname $(readlink -f $0)`
+CONFIG_FILE="$SCRIPT_DIR/../etc/privateCA.conf"
+CERT_REQ=''
+CERT_KEY=''
+CERT=''
+
+usage() {
+  echo $1
+  echo  "Usage: $0 <name> <filename>"
+  echo "Where:"
+  echo "  name - person name"
+  echo "  filename - used for  <filename>.crt and <filename>.key files creation"
+}
+
+configure() {
+  # First set default values
+ CERT_REQ=$(mktemp -t privateCA.XXX.csr)
+  
+  if [ -e "$CONFIG_FILE" ]
+  then
+    . $CONFIG_FILE
+  fi
+}
+
+cleanup() {
+  if [ -e "$CERT_REQ" ]
+  then
+    rm -f $CERT_REQ
+  fi
+}
+
+if [ -z "$1" ]
+then
+  usage "No name specified!\n"
+  exit 1
+elif [ -z "$2" ]
+then
+  usage "No filename specified!\n"
+  exit 1
+fi
+
+echo $@
+
+configure
+
+CERT_KEY="$USER_CERT_STOR/$2.key"
+CERT="$USER_CERT_STOR/$2.crt"
+
+if [ -e "$CERT_KEY" ] || [ -e "$CERT" ]
+then
+  echo "Certificate $2.crt or key $2.key already exists!"
+  exit 1
+fi
+
+$OPENSSL req -new -utf8 -nameopt multiline,utf8 -subj "$SUBJ_PREFIX$1" -keyout $CERT_KEY -nodes -out $CERT_REQ -config $OPENSSL_CONF
+
+if [ $? -ne 0 ]
+then
+  cleanup
+  exit 2
+fi
+
+$OPENSSL ca -in $CERT_REQ -out $CERT -config $OPENSSL_CONF -batch
+
+if [ $? -ne 0 ]
+then
+  cleanup
+  exit 3
+fi
+
+cleanup
+exit 0
+
